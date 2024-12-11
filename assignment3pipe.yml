@@ -1,0 +1,54 @@
+pipeline {
+    agent any
+
+    environment {
+        // Azure credentials from Jenkins environment variables
+        AZURE_CLIENT_ID = credentials('azure-client-id')
+        AZURE_CLIENT_SECRET = credentials('azure-client-secret')
+        AZURE_TENANT_ID = credentials('azure-tenant-id')
+        RESOURCE_GROUP = 'YourResourceGroup'
+        FUNCTION_APP_NAME = 'YourFunctionAppName'
+    }
+
+    stages {
+        stage('Build') {
+            steps {
+                echo 'Building the application...'
+                sh 'dotnet restore'  // Restore dependencies for C# projects
+                sh 'dotnet publish -o ./publish'  // Publish to the "publish" folder
+            }
+        }
+
+        stage('Test') {
+            steps {
+                echo 'Running tests...'
+                // Replace with your test commands
+                sh 'dotnet test'
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                echo 'Deploying the application to Azure...'
+                script {
+                    sh """
+                        az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET --tenant $AZURE_TENANT_ID
+                        az functionapp deployment source config-zip \
+                            --resource-group $RESOURCE_GROUP \
+                            --name $FUNCTION_APP_NAME \
+                            --src ./publish.zip
+                    """
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Pipeline completed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed!'
+        }
+    }
+}
